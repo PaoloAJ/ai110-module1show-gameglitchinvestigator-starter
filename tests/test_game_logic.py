@@ -1,4 +1,4 @@
-from logic_utils import check_guess, parse_guess, update_score, get_range_for_difficulty
+from logic_utils import check_guess, parse_guess, update_score, get_range_for_difficulty, validate_in_range
 
 
 # --- check_guess tests ---
@@ -100,3 +100,30 @@ def test_hard_range_wider_than_normal():
     _, normal_high = get_range_for_difficulty("Normal")
     _, hard_high = get_range_for_difficulty("Hard")
     assert hard_high > normal_high
+
+
+# --- validate_in_range tests ---
+
+def test_guess_in_range():
+    ok, err = validate_in_range(10, 1, 20)
+    assert ok is True
+    assert err is None
+
+
+def test_guess_out_of_range_high():
+    ok, err = validate_in_range(500, 1, 100)
+    assert ok is False
+    assert "between" in err
+
+
+def test_guess_out_of_range_low():
+    ok, err = validate_in_range(-5, 1, 100)
+    assert ok is False
+    assert "between" in err
+
+
+def test_guess_at_boundary():
+    ok, _ = validate_in_range(1, 1, 100)
+    assert ok is True
+    ok, _ = validate_in_range(100, 1, 100)
+    assert ok is True

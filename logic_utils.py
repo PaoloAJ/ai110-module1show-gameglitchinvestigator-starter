@@ -36,6 +36,13 @@ def parse_guess(raw: str):
     return True, value, None
 
 
+def validate_in_range(guess: int, low: int, high: int):
+    """Check if guess is within the valid range. Returns (ok, error_message)."""
+    if guess < low or guess > high:
+        return False, f"Please guess a number between {low} and {high}."
+    return True, None
+
+
 def check_guess(guess, secret):
     """
     Compare guess to secret and return (outcome, message).

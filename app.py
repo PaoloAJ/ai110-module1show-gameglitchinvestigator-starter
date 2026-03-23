@@ -2,7 +2,7 @@ import random
 import streamlit as st
 
 # FIX: Import game logic from logic_utils.py instead of defining inline
-from logic_utils import get_range_for_difficulty, parse_guess, check_guess, update_score
+from logic_utils import get_range_for_difficulty, parse_guess, check_guess, update_score, validate_in_range
 
 st.set_page_config(page_title="Glitchy Guesser", page_icon="🎮")
 
@@ -29,8 +29,21 @@ low, high = get_range_for_difficulty(difficulty)
 st.sidebar.caption(f"Range: {low} to {high}")
 st.sidebar.caption(f"Attempts allowed: {attempt_limit}")
 
+# FIX: Track which difficulty the secret was generated for.
+# When difficulty changes, reset the game so the secret matches the new range.
+if "difficulty" not in st.session_state:
+    st.session_state.difficulty = difficulty
+
 if "secret" not in st.session_state:
     st.session_state.secret = random.randint(low, high)
+
+if st.session_state.difficulty != difficulty:
+    st.session_state.difficulty = difficulty
+    st.session_state.secret = random.randint(low, high)
+    st.session_state.attempts = 0
+    st.session_state.history = []
+    st.session_state.score = 0
+    st.session_state.status = "playing"
 
 # FIX: Initialize attempts to 0 (not 1) so first guess is attempt 1
 if "attempts" not in st.session_state:
@@ -60,18 +73,18 @@ with st.expander("Developer Debug Info"):
     st.write("Difficulty:", difficulty)
     st.write("History:", st.session_state.history)
 
-raw_guess = st.text_input(
-    "Enter your guess:",
-    key=f"guess_input_{difficulty}"
-)
+# FIX: Use a form so that pressing Enter submits the guess (not just the button)
+with st.form("guess_form"):
+    raw_guess = st.text_input("Enter your guess:")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        submit = st.form_submit_button("Submit Guess 🚀")
+    with col2:
+        pass
+    with col3:
+        show_hint = st.checkbox("Show hint", value=True)
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    submit = st.button("Submit Guess 🚀")
-with col2:
-    new_game = st.button("New Game 🔁")
-with col3:
-    show_hint = st.checkbox("Show hint", value=True)
+new_game = st.button("New Game 🔁")
 
 if new_game:
     # FIX: Reset attempts to 0 (consistent with init) and clear history
@@ -94,39 +107,43 @@ if submit:
     ok, guess_int, err = parse_guess(raw_guess)
 
     if not ok:
-        st.session_state.history.append(raw_guess)
         st.error(err)
     else:
-        st.session_state.attempts += 1
-        st.session_state.history.append(guess_int)
-
-        # FIX: Always pass secret as int — removed the bug that converted to string on even attempts
-        outcome, message = check_guess(guess_int, st.session_state.secret)
-
-        if show_hint:
-            st.warning(message)
-
-        st.session_state.score = update_score(
-            current_score=st.session_state.score,
-            outcome=outcome,
-            attempt_number=st.session_state.attempts,
-        )
-
-        if outcome == "Win":
-            st.balloons()
-            st.session_state.status = "won"
-            st.success(
-                f"You won! The secret was {st.session_state.secret}. "
-                f"Final score: {st.session_state.score}"
-            )
+        # FIX: Validate guess is within the allowed range
+        in_range, range_err = validate_in_range(guess_int, low, high)
+        if not in_range:
+            st.error(range_err)
         else:
-            if st.session_state.attempts >= attempt_limit:
-                st.session_state.status = "lost"
-                st.error(
-                    f"Out of attempts! "
-                    f"The secret was {st.session_state.secret}. "
-                    f"Score: {st.session_state.score}"
+            st.session_state.attempts += 1
+            st.session_state.history.append(guess_int)
+
+            # FIX: Always pass secret as int — removed the bug that converted to string on even attempts
+            outcome, message = check_guess(guess_int, st.session_state.secret)
+
+            if show_hint:
+                st.warning(message)
+
+            st.session_state.score = update_score(
+                current_score=st.session_state.score,
+                outcome=outcome,
+                attempt_number=st.session_state.attempts,
+            )
+
+            if outcome == "Win":
+                st.balloons()
+                st.session_state.status = "won"
+                st.success(
+                    f"You won! The secret was {st.session_state.secret}. "
+                    f"Final score: {st.session_state.score}"
                 )
+            else:
+                if st.session_state.attempts >= attempt_limit:
+                    st.session_state.status = "lost"
+                    st.error(
+                        f"Out of attempts! "
+                        f"The secret was {st.session_state.secret}. "
+                        f"Score: {st.session_state.score}"
+                    )
 
 st.divider()
 st.caption("Built by an AI that claims this code is production-ready.")
